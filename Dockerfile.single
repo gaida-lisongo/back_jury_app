@@ -1,0 +1,22 @@
+# Base image for Node.js app
+FROM node:18-alpine as app
+
+WORKDIR /usr/src/app
+
+# Install Memcached
+RUN apk add --no-cache memcached
+
+# Copy app files
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+# Expose ports
+EXPOSE 3000 11211
+
+# Start script
+COPY start.sh /
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
