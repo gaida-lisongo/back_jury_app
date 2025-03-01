@@ -32,33 +32,63 @@ class DashboardModel extends UserModelModel {
 
     async getStudentGrades(studentId, courseId) {
         const sql = `
-            SELECT *
-            FROM fiche_cotation f
-            WHERE f.id_etudiant = ? AND f.id_matiere = ?
+            SELECT note.*,
+                CASE 
+                    WHEN (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0)) < COALESCE(note.rattrapage, 0) 
+                    THEN COALESCE(note.rattrapage, 0)
+                    ELSE (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0))
+                END as total,
+                m.credit * (
+                    CASE 
+                        WHEN (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0)) < COALESCE(note.rattrapage, 0)
+                        THEN COALESCE(note.rattrapage, 0)
+                        ELSE (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0))
+                    END
+                ) as total_pond,
+                CASE 
+                    WHEN (
+                        CASE 
+                            WHEN (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0)) < COALESCE(note.rattrapage, 0) 
+                            THEN COALESCE(note.rattrapage, 0)
+                            ELSE (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0))
+                        END
+                    ) < 10 THEN m.credit
+                    ELSE 0
+                END as ncnv
+            FROM fiche_cotation note
+            INNER JOIN matiere m ON m.id = note.id_matiere
+            WHERE note.id_etudiant = ? AND note.id_matiere = ?
         `;
         return await this.read(sql, [studentId, courseId]);
     }
 
     async getRecoursDistribution(promotionId) {
         const sql = `
-            SSELECT c.designation as cours, COUNT(cr.id) AS total_recours, u.code
+            SELECT 
+                c.id, 
+                cr.date_creation, 
+                c.designation as cours, 
+                COUNT(cr.id) AS total_recours, 
+                u.code,
+                YEAR(cr.date_creation) AS annee
             FROM matiere c
             INNER JOIN unite u ON u.id = c.id_unite
             LEFT JOIN commande_recours cr ON cr.id_matiere = c.id
             WHERE u.id_promotion = ?
             GROUP BY c.id
-            ORDER BY total_recours DESC
+            ORDER BY total_recours DESC;
         `;
         return await this.read(sql, [promotionId]);
     }
 
-    async getBestStudent(anneeId) {
+    async getBestStudent(anneeId, promotionId) {
         const sql = `            
             SELECT cotes.id, cotes.nom, cotes.post_nom, cotes.prenom, cotes.matricule, SUM(cotes.total_pond) AS note, SUM(cotes.ncnv) AS ncnv
             FROM (SELECT 
                 e.*,
                 n.code,
                 m.designation,
+                n.id_promotion,
                 m.credit,
                 CASE 
                     WHEN (COALESCE(note.tp, 0) + COALESCE(note.td, 0) + COALESCE(note.examen, 0)) < COALESCE(note.rattrapage, 0) 
@@ -90,12 +120,13 @@ class DashboardModel extends UserModelModel {
             INNER JOIN fiche_cotation note ON note.id_etudiant = e.id
             INNER JOIN matiere m ON m.id = note.id_matiere
             INNER JOIN unite n ON n.id = m.id_unite
-            WHERE note.id_annee = 3 AND n.id_promotion = 3
+            WHERE note.id_annee = ? AND n.id_promotion = ?
             ORDER BY total_pond DESC) AS cotes
-            GROUP BY cotes.id;
+            GROUP BY cotes.id
+            ORDER BY note DESC
 
         `;
-        return await this.read(sql, [anneeId]);
+        return await this.read(sql, [anneeId, promotionId]);
     }
 
     async getValidationSheetsStats(promotionId) {
