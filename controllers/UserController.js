@@ -1,7 +1,7 @@
 const Controller = require('./Controller');
 const UserModel = require('../models/UserModel');
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 class UserController extends Controller {
     constructor() {
@@ -12,18 +12,30 @@ class UserController extends Controller {
         this.modif = {};
     }
 
+    generateToken(user) {
+        return jwt.sign(
+            { 
+                userId: user.id,
+                email: user.email,
+                role: user.role
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+    }
+
     async login(req, res) {
         try {
-            const { email, password } = req.body;
+            const { matricule, password } = req.body;
 
             // Vérifier l'utilisateur
-            const user = await this.model.findByEmail(email);
+            const user = await this.model.findUserByMatricule(matricule, password);
             if (!user) {
                 return this.unauthorized(res, 'Email ou mot de passe incorrect');
             }
 
             // Vérifier le mot de passe
-            const validPassword = await this.model.verifyPassword(password, user.password);
+            const validPassword = await this.model.verifyPassword(password, user.mdp);
             if (!validPassword) {
                 return this.unauthorized(res, 'Email ou mot de passe incorrect');
             }
@@ -35,13 +47,15 @@ class UserController extends Controller {
             }
 
             // Préparer la réponse
-            delete user.password;
+            delete user.mdp;
+            const token = this.generateToken({userId: user.id, email: user.e_mail, role: "jury"});
             this.user = user;
             this.annees = jurys;
 
             return this.success(res, {
                 user: this.user,
-                jurys: this.annees
+                jurys: this.annees,
+                token
             });
         } catch (error) {
             return this.error(res, error.message);
@@ -65,17 +79,29 @@ class UserController extends Controller {
     }
 
     generatePassword() {
-        return crypto.randomBytes(8).toString('hex');
+        const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let password = '';
+        for (let i = 0; i < 6; i++) {
+            const randomIndex = Math.floor(Math.random() * charset.length);
+            password += charset[randomIndex];
+
+        }
+
+        return password;
     }
 
     async sendMail(to, subject, html) {
+
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST,
-            port: process.env.SMTP_PORT,
-            secure: true,
+            port: parseInt(process.env.SMTP_PORT || '465'),
+            secure: true, // Changé de true à false
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
+            },
+            tls: {
+                rejectUnauthorized: false // Ajout de cette option
             }
         });
 
@@ -97,6 +123,7 @@ class UserController extends Controller {
             }
 
             const newPassword = this.generatePassword();
+
             await this.model.updatePassword(user.id, newPassword);
 
             const mailHtml = `

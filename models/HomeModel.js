@@ -16,6 +16,13 @@ class HomeModel extends BaseModel {
         return await this.read(sql);
     }
 
+    async getAnneesAcad(){
+        const sql = `
+            SELECT * FROM annee
+        `;
+        return await this.read(sql);
+    }
+
     async getRecentActivities(limit = 5) {
         const sql = `
             SELECT 

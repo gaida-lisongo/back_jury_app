@@ -2,9 +2,12 @@ version: '3.8'
 
 services:
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: jury-app
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NODE_ENV=development
       - MEMCACHED_HOST=memcached
@@ -12,18 +15,16 @@ services:
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
+    command: sh -c "npm rebuild bcrypt --build-from-source && npm run dev"
     depends_on:
       - memcached
-    networks:
-      - app-network
 
   memcached:
     image: memcached:1.6-alpine
+    container_name: jury-memcached
     ports:
       - "11211:11211"
-    networks:
-      - app-network
 
 networks:
-  app-network:
-    driver: bridge
+  default:
+    name: jury-network

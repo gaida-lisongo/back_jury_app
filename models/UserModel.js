@@ -1,5 +1,5 @@
 const Model = require('./Model');
-const bcrypt = require('bcrypt');
+const bcrypt = require('crypto');
 
 class UserModel extends Model {
     constructor() {
@@ -8,48 +8,56 @@ class UserModel extends Model {
     }
 
     async hashPassword(password) {
-        return await bcrypt.hash(password, this.saltRounds);
+        return await bcrypt.createHash('sha256')
+        .update(password)
+        .digest('hex');
     }
 
     async verifyPassword(plainPassword, hashedPassword) {
-        return await bcrypt.compare(plainPassword, hashedPassword);
+        const hash = await this.hashPassword(plainPassword)
+        
+        return hash == hashedPassword;
     }
 
     async findByEmail(email) {
         const sql = `
             SELECT * FROM agent 
-            WHERE email = ?
-            AND statut = 1
+            WHERE e_mail = ?
         `;
         const users = await this.read(sql, [email]);
         return users[0];
     }
 
+    async findUserByMatricule(matricule, mdp) {
+        const hashedPassword = await this.hashPassword(mdp);
+        const sql = `SELECT a.*
+            FROM agent a
+            INNER JOIN affectation af ON af.id_agent = a.id
+            INNER JOIN poste p ON p.id = af.id_poste
+            WHERE p.designation = 'JURY' AND matricule = ? AND mdp = ?
+        `;
+        const users = await this.read(sql, [matricule, hashedPassword]);
+  
+        return users[0];
+    }
+
     async findUserJurys(userId) {
         const sql = `
-            SELECT DISTINCT
-                a.id,
-                CONCAT(a.debut, ' - ', a.fin) as annee_acad,
-                j.id as jury_id,
-                j.designation as jury_nom,
-                j.date_debut,
-                j.date_fin,
-                j.statut
-            FROM annee a
-            INNER JOIN jury j ON j.id_annee = a.id
-            INNER JOIN jury_agent ja ON ja.id_jury = j.id
-            WHERE ja.id_agent = ?
-            ORDER BY a.debut DESC
+            SELECT *
+            FROM niveau_jury dj
+            INNER JOIN jury j ON dj.id_jury = j.id
+            INNER JOIN promotion p ON p.id = dj.id_niveau
+            WHERE j.id_president = ? OR j.id_secretaire = ? OR j.id_membre = ?
+            GROUP BY dj.id_jury
         `;
-        return await this.read(sql, [userId]);
+        return await this.read(sql, [userId, userId, userId]);
     }
 
     async updatePassword(userId, password) {
         const hashedPassword = await this.hashPassword(password);
         const sql = `
             UPDATE agent 
-            SET password = ?, 
-                updated_at = NOW() 
+            SET mdp = ? 
             WHERE id = ?
         `;
         return await this.update(sql, [hashedPassword, userId]);
@@ -57,8 +65,8 @@ class UserModel extends Model {
 
     async updateUserInfo(userId, userInfo) {
         // Si le mot de passe est inclus dans userInfo, le hasher
-        if (userInfo.password) {
-            userInfo.password = await this.hashPassword(userInfo.password);
+        if (userInfo.mdp) {
+            userInfo.mdp = await this.hashPassword(userInfo.mdp);
         }
         
         const sql = `

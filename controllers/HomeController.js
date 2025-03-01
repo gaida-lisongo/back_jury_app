@@ -6,6 +6,16 @@ class HomeController extends Controller {
     constructor() {
         super();
         this.model = new HomeModel();
+        this.annees = this.model.getAnneesAcad()
+                        .then((result) => {
+                            console.log("result", result);
+                            return result;
+                            
+                        })
+                        .catch((error) => {
+                            return error;
+                        });
+        
     }
 
     async index(req, res) {
@@ -20,6 +30,7 @@ class HomeController extends Controller {
             };
         });
     }
+    
 
     async getServerStatus(req, res) {
         try {
