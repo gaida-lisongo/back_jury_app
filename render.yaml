@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: jury-app
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MEMCACHED_HOST
+        fromService:
+          type: memcached
+          name: jury-cache
+          property: host
+      - key: MEMCACHED_PORT
+        value: 11211
+      - key: PORT
+        value: 3000
+
+  - type: memcached
+    name: jury-cache
+    ipAllowList: []
+    plan: starter
