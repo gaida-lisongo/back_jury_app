@@ -1,7 +1,8 @@
-const Controller = require('./Controller');
+const UserController = require('./UserController');
 const PromotionModel = require('../models/PromotionModel');
+const mailer = require('../utils/mailer');
 
-class PromotionController extends Controller {
+class PromotionController extends UserController {
     constructor() {
         super();
         this.model = new PromotionModel();
@@ -10,7 +11,7 @@ class PromotionController extends Controller {
     async grillesPromotion(req, res) {
         try {
             const { anneeId, promotionId, type } = req.params;
-            const cacheKey = `grille_${promotionId}_${anneeId}_${type}`;
+            const cacheKey = `gri-lles_${promotionId}_${anneeId}_${type}`;
 
             return await this.withCache(res, cacheKey, async () => {
                 const data = await this.model.getGrillePromotion(anneeId, promotionId, type);
@@ -26,11 +27,32 @@ class PromotionController extends Controller {
 
     async changeCote(req, res) {
         try {
-            const { coteId } = req.params;
-            const { value, justification } = req.body;
-            const agentId = req.user.id;
+            const { coteId, type } = req.params;
+            const { value, justification, agentId, lastValue} = req.body;
 
-            await this.model.updateNote(coteId, value, agentId, justification);
+
+            // Récupérer l'ancienne valeur
+            const oldNote = await this.model.getNoteDetails(coteId);
+            
+            // Mettre à jour la note
+            await this.model.updateNote(coteId, value, agentId, justification, type, lastValue);
+
+            // Envoyer l'email de notification
+            const notif = await this.sendMail(
+                "contact@admin.inbtp.net",
+                "Modification de note - INBTP Jury",
+                `
+                    <h2>${oldNote.nom} ${oldNote.postnom} ${oldNote.prenom}</h2>
+                    <br />>
+                    <p><strong>Matière:</strong> ${oldNote.cours}</p>
+                    <p><strong>Type de note:</strong> ${oldNote.cote}</p>
+                    <p><strong>Ancienne valeur:</strong> ${oldNote.last_val}</p>
+                    <p><strong>Nouvelle valeur:</strong> ${value}</p>
+                    <p><strong>Modifié par:</strong> ${oldNote.agent}</p>
+                    <p><strong>Justification:</strong> ${justification}</p>
+                    <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                `
+            )
             
             // Clear related cache
             await this.deleteFromCache('grille_*');
@@ -43,11 +65,29 @@ class PromotionController extends Controller {
 
     async addCote(req, res) {
         try {
-            const { matiereId, etudiantId, value, justification } = req.body;
-            const agentId = req.user.id;
+            const { matiereId, etudiantId, value, justification, agentId, anneeId } = req.body;
+            const { type } = req.params;
+            const noteId = await this.model.addNote(matiereId, etudiantId, value, agentId, type, anneeId);
+          
+            // Récupérer l'ancienne valeur
+            const oldNote = await this.model.getCoteDetail(noteId);
 
-            const noteId = await this.model.addNote(matiereId, etudiantId, value, agentId);
-            await this.model.addNoteNotification(noteId, agentId, justification);
+            // Envoyer l'email de notification
+            const notif = await this.sendMail(
+                "contact@admin.inbtp.net",
+                "Insertion de note - INBTP Jury",
+                `
+                    <h2>${oldNote.nom} ${oldNote.postnom} ${oldNote.prenom}</h2>
+                    <br />
+                    <p><strong>Matière:</strong> ${oldNote.cours}</p>
+                    <p><strong>Type de note:</strong> ${(type).toUpperCase()}</p>
+                    <p><strong>Valeur de la cote:</strong> ${value}</p>
+                    <p><strong>Insérer par:</strong> ${oldNote.agent}</p>
+                    <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>REF/ID:</strong> ${noteId}</p>
+                `
+            )
+            // await this.model.addNoteNotification(noteId, agentId, justification);
             
             // Clear related cache
             await this.deleteFromCache('grille_*');

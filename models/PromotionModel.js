@@ -1,6 +1,6 @@
-const Model = require('./Model');
+const UserModel = require('./UserModel');
 
-class PromotionModel extends Model {
+class PromotionModel extends UserModel {
     constructor() {
         super('promotion');
     }
@@ -49,10 +49,10 @@ class PromotionModel extends Model {
         return await this.read(sql, [anneeId, promotionId]);
     }
 
-    async updateNote(noteId, value, agentId, justification) {
+    async updateNote(noteId, value, agentId, justification, type, lastValue = null) {
         const sql = `
             UPDATE fiche_cotation 
-            SET examen = ?,
+            SET ${type} = ?,
                 updated_at = NOW(),
                 updated_by = ?
             WHERE id = ?
@@ -61,20 +61,19 @@ class PromotionModel extends Model {
 
         // Log the modification
         const logSql = `
-            INSERT INTO note_historique 
-            (id_note, id_agent, justification, ancienne_valeur, nouvelle_valeur) 
-            VALUES (?, ?, ?, (SELECT examen FROM fiche_cotation WHERE id = ?), ?)
+            INSERT INTO insertion (id_fiche_cotation, id_agent, cote, last_val, description) 
+            VALUES (?, ?, ?, ?, ?)
         `;
-        await this.create(logSql, [noteId, agentId, justification, noteId, value]);
+        await this.create(logSql, [noteId, agentId, type, lastValue, justification]);
     }
 
-    async addNote(matiereId, etudiantId, value, agentId) {
+    async addNote(matiereId, etudiantId, value, agentId, type, anneeId) {
         const sql = `
             INSERT INTO fiche_cotation 
-            (id_matiere, id_etudiant, examen, created_by, created_at)
-            VALUES (?, ?, ?, ?, NOW())
+            (id_matiere, id_etudiant, ${type}, created_by, id_annee)
+            VALUES (?, ?, ?, ?, ?)
         `;
-        return await this.create(sql, [matiereId, etudiantId, value, agentId]);
+        return await this.create(sql, [matiereId, etudiantId, value, agentId, anneeId]);
     }
 
     async addNoteNotification(noteId, agentId, justification) {
@@ -84,6 +83,45 @@ class PromotionModel extends Model {
             VALUES (?, ?, ?, 'INSERT')
         `;
         return await this.create(sql, [noteId, agentId, justification]);
+    }
+
+    async getNoteDetails(noteId) {
+        const sql = `
+            SELECT 
+                i.*,
+                e.nom,
+                e.post_nom AS 'postnom',
+                e.prenom,
+                CONCAT(a.nom, ' ', a.post_nom, ' (', a.matricule, ')') AS agent,
+                m.designation as cours
+            FROM fiche_cotation fc
+            INNER JOIN insertion i ON i.id_fiche_cotation = fc.id
+            INNER JOIN agent a ON a.id = i.id_agent
+            INNER JOIN etudiant e ON e.id = fc.id_etudiant
+            INNER JOIN matiere m ON m.id = fc.id_matiere
+            WHERE fc.id = ?
+        `;
+        const [note] = await this.read(sql, [noteId]);
+        return note;
+    }
+
+    async getCoteDetail(noteId) {
+        const sql = `
+            SELECT 
+                fc.*,
+                e.nom,
+                e.post_nom AS 'postnom',
+                e.prenom,
+                CONCAT(a.nom, ' ', a.post_nom, ' (', a.matricule, ')') AS agent,
+                m.designation as cours
+            FROM fiche_cotation fc
+            INNER JOIN agent a ON a.id = fc.created_by
+            INNER JOIN etudiant e ON e.id = fc.id_etudiant
+            INNER JOIN matiere m ON m.id = fc.id_matiere
+            WHERE fc.id = ?
+        `;
+        const [note] = await this.read(sql, [noteId]);
+        return note;
     }
 }
 
