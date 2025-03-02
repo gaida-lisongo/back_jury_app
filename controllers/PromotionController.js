@@ -43,7 +43,7 @@ class PromotionController extends UserController {
                 "Modification de note - INBTP Jury",
                 `
                     <h2>${oldNote.nom} ${oldNote.postnom} ${oldNote.prenom}</h2>
-                    <br />>
+                    <hr />
                     <p><strong>Matière:</strong> ${oldNote.cours}</p>
                     <p><strong>Type de note:</strong> ${oldNote.cote}</p>
                     <p><strong>Ancienne valeur:</strong> ${oldNote.last_val}</p>

@@ -8,7 +8,6 @@ class HomeController extends Controller {
         this.model = new HomeModel();
         this.annees = this.model.getAnneesAcad()
                         .then((result) => {
-                            console.log("result", result);
                             return result;
                             
                         })
