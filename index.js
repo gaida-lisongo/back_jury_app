@@ -18,10 +18,8 @@ const io = socketIO(server, {
 
 // CORS configuration
 const corsOptions = {
-  origin: '*', // En développement, permet toutes les origines
+  origin: ['*', 'http://localhost:3000'], // En développement, permet toutes les origines et localhost
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
 };
 
 app.use(cors(corsOptions));

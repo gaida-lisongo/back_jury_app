@@ -10,6 +10,7 @@ class ProduitController extends UserController {
     async recoursPromotion(req, res) {
         try {
             const { promotionId } = req.params;
+            console.log(promotionId);
             return await this.withCache(res, `recours_${promotionId}`, async () => {
                 const recours = await this.model.recoursPromotion(promotionId);
                 return recours;
@@ -59,10 +60,9 @@ class ProduitController extends UserController {
         try {
             const { type } = req.params;
             const data = {
-                ...req.body,
-                agentId: req.user.id
+                ...req.body
             };
-
+            console.log(data)
             const retraitId = await this.model.addRetraits(type, data);
             
             // Clear related cache

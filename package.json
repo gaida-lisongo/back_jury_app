@@ -9,8 +9,9 @@
     "dev": "nodemon index.js",
     "docker:dev": "docker-compose up --build",
     "docker:down": "docker-compose down",
-    "render-postbuild": "npm install",
-    "render-start": "node index.js"
+    "docker:build": "docker build -t lisongo/jury-full:latest -t lisongo/jury-full:1.1 -f Dockerfile.single .",
+    "docker:push": "docker push lisongo/jury-full:latest && docker push lisongo/jury-full:1.1",
+    "docker:update": "npm run docker:build && npm run docker:push"
   },
   "keywords": [
     "annees",

@@ -12,16 +12,12 @@ class ProduitModel extends UserModel {
                 m.designation as matiere,
                 e.nom,
                 e.post_nom,
-                e.prenom,
-                CONCAT(a.nom, ' ', a.post_nom) as agent
+                e.prenom
             FROM commande_recours cr
+            INNER JOIN recours ON recours.id = cr.id_recours
             INNER JOIN matiere m ON m.id = cr.id_matiere
             INNER JOIN etudiant e ON e.id = cr.id_etudiant
-            INNER JOIN agent a ON a.id = cr.created_by
-            WHERE m.id_unite IN (
-                SELECT id FROM unite WHERE id_promotion = ?
-            )
-            AND cr.statut = 'OK'
+            WHERE cr.statut = 'OK' AND recours.id_promotion = ?
             ORDER BY cr.date_creation DESC
         `;
         return await this.read(sql, [promotionId]);
@@ -31,21 +27,14 @@ class ProduitModel extends UserModel {
         const sql = `
             SELECT 
                 rr.*,
-                cr.reference,
-                m.designation as matiere,
-                e.nom,
-                e.post_nom,
-                e.prenom,
-                CONCAT(a.nom, ' ', a.post_nom) as agent_retrait
+                CONCAT(a.nom, ' ', a.post_nom) as agent_retrait,
+                a.telephone,
+                a.e_mail,
+                a.matricule
             FROM retrait_recours rr
-            INNER JOIN commande_recours cr ON cr.id = rr.id_commande
-            INNER JOIN matiere m ON m.id = cr.id_matiere
-            INNER JOIN etudiant e ON e.id = cr.id_etudiant
-            INNER JOIN agent a ON a.id = rr.created_by
-            WHERE m.id_unite IN (
-                SELECT id FROM unite WHERE id_promotion = ?
-            )
-            ORDER BY rr.date_retrait DESC
+            INNER JOIN agent a ON a.id = rr.id_agent
+            WHERE rr.id_promotion = ?
+            ORDER BY rr.date_creation DESC
         `;
         return await this.read(sql, [promotionId]);
     }
@@ -54,15 +43,12 @@ class ProduitModel extends UserModel {
         const sql = `
             SELECT 
                 cv.*,
-                fv.type_validation,
                 e.nom,
                 e.post_nom,
-                e.prenom,
-                CONCAT(a.nom, ' ', a.post_nom) as agent
+                e.prenom
             FROM commande_validation cv
-            INNER JOIN fiche_validation fv ON fv.id = cv.id_fiche
-            INNER JOIN etudiant e ON e.id = fv.id_etudiant
-            INNER JOIN agent a ON a.id = cv.created_by
+            INNER JOIN fiche_validation fv ON fv.id = cv.id_validation
+            INNER JOIN etudiant e ON e.id = cv.id_etudiant
             WHERE fv.id_promotion = ?
             AND cv.statut = 'OK'
             ORDER BY cv.date_creation DESC
@@ -74,19 +60,11 @@ class ProduitModel extends UserModel {
         const sql = `
             SELECT 
                 rv.*,
-                cv.reference,
-                fv.type_validation,
-                e.nom,
-                e.post_nom,
-                e.prenom,
-                CONCAT(a.nom, ' ', a.post_nom) as agent_retrait
+                CONCAT(a.nom, ' ', a.post_nom, ' ', a.prenom ) as agent_retrait
             FROM retrait_validation rv
-            INNER JOIN commande_validation cv ON cv.id = rv.id_commande
-            INNER JOIN fiche_validation fv ON fv.id = cv.id_fiche
-            INNER JOIN etudiant e ON e.id = fv.id_etudiant
-            INNER JOIN agent a ON a.id = rv.created_by
-            WHERE fv.id_promotion = ?
-            ORDER BY rv.date_retrait DESC
+            INNER JOIN agent a ON a.id = rv.id_agent
+            WHERE rv.id_promotion = ?
+            ORDER BY rv.date_creation DESC
         `;
         return await this.read(sql, [promotionId]);
     }
@@ -94,20 +72,18 @@ class ProduitModel extends UserModel {
     async addRetraits(type, data) {
         let sql, params;
 
-        if (type === 'RECOURS') {
+        if (type == 'RECOURS') {
             sql = `
-                INSERT INTO retrait_recours 
-                (id_commande, created_by, date_retrait)
-                VALUES (?, ?, NOW())
+                INSERT INTO retrait_recours (id_agent, date_creation, montant, statut, date_validation, transaction, id_promotion)
+                VALUES (?, NOW(), ?, 'OK', NOW(), ?, ?)
             `;
-            params = [data.commandeId, data.agentId];
+            params = [data.agentId, data.montant, data.transaction, data.promotionId];
         } else {
             sql = `
-                INSERT INTO retrait_validation 
-                (id_commande, created_by, date_retrait)
-                VALUES (?, ?, NOW())
+                INSERT INTO retrait_validation (id_agent, date_creation, montant, statut, date_validation, transaction, id_promotion)
+                VALUES (?, NOW(),?,'OK', NOW(),?,?)
             `;
-            params = [data.commandeId, data.agentId];
+            params = [data.agentId, data.montant, data.transaction, data.promotionId];
         }
 
         return await this.create(sql, params);
