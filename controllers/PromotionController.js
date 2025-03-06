@@ -23,6 +23,7 @@ class PromotionController extends UserController {
                 
                 // Organize data by units and students
                 const grille = this.organizeGrilleData(data, maxPromotionCredits);
+                console.log(grille);
                 return grille;
             });
         } catch (error) {
