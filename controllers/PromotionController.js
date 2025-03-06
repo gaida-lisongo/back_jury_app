@@ -11,13 +11,18 @@ class PromotionController extends UserController {
     async grillesPromotion(req, res) {
         try {
             const { anneeId, promotionId, type } = req.params;
+            const matieresOfPromotion = await this.model.getMatieresOfPromotion(promotionId);
+
+            const totalCredits = matieresOfPromotion.reduce((acc, matiere) => acc + matiere.credit, 0);
+            const maxPromotionCredits = 20 * totalCredits;
+
             const cacheKey = `gri-lles_${promotionId}_${anneeId}_${type}`;
 
             return await this.withCache(res, cacheKey, async () => {
                 const data = await this.model.getGrillePromotion(anneeId, promotionId, type);
                 
                 // Organize data by units and students
-                const grille = this.organizeGrilleData(data);
+                const grille = this.organizeGrilleData(data, maxPromotionCredits);
                 return grille;
             });
         } catch (error) {
@@ -110,10 +115,10 @@ class PromotionController extends UserController {
         }
     }
 
-    organizeGrilleData(data) {
+    organizeGrilleData(data, max) {
         const grille = {
             unites: {},
-            moyennes: {},
+            moyennes: max,
             decisions: {}
         };
 
@@ -139,7 +144,7 @@ class PromotionController extends UserController {
             grille.unites[row.unite_code].matieres[row.matiere_id].notes.push({
                 noteId: row.note_id,
                 etudiantId: row.etudiant_id,
-                nom: `${row.nom} ${row.postnom}`,
+                nom: `${row.nom} ${row.post_nom} ${row.prenom}`,
                 total: row.total,
                 tp: row.tp,
                 td: row.td,
@@ -148,6 +153,11 @@ class PromotionController extends UserController {
                 ncnv: row.ncnv
             });
         });
+
+        //  Calculate moyennes de la promotion
+        /*
+        1. Recupération de 
+        */
 
         return grille;
     }

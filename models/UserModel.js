@@ -43,7 +43,7 @@ class UserModel extends Model {
 
     async findUserJurys(userId) {
         const sql = `
-            SELECT *
+            SELECT j.*, dj.id_niveau, dj.id_annee, p.vision
             FROM niveau_jury dj
             INNER JOIN jury j ON dj.id_jury = j.id
             INNER JOIN promotion p ON p.id = dj.id_niveau

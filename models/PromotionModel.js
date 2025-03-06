@@ -48,6 +48,15 @@ class PromotionModel extends UserModel {
         `;
         return await this.read(sql, [anneeId, promotionId]);
     }
+    async getMatieresOfPromotion(promotionId) {
+        const sql = `
+            SELECT m.*
+            FROM unite u
+            INNER JOIN matiere m ON m.id_unite = u.id
+            WHERE u.id_promotion = ? 
+        `;
+        return await this.read(sql, [ promotionId]);
+    }
 
     async updateNote(noteId, value, agentId, justification, type, lastValue = null) {
         const sql = `
